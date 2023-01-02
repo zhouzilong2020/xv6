@@ -1,10 +1,16 @@
-#include "defs.h"
-#include "memlayout.h"
-#include "param.h"
-#include "proc.h"
-#include "riscv.h"
-#include "spinlock.h"
 #include "types.h"
+//
+#include "riscv.h"
+//
+#include "defs.h"
+//
+#include "param.h"
+//
+#include "memlayout.h"
+//
+#include "spinlock.h"
+//
+#include "proc.h"
 
 uint64 sys_exit(void) {
   int n;
@@ -68,4 +74,13 @@ uint64 sys_uptime(void) {
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// return the trace mask.
+uint64 sys_trace(void) {
+  int tracemask;
+
+  argint(0, &tracemask);
+  myproc()->tracemask = tracemask;
+  return 0;
 }
