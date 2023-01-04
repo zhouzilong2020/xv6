@@ -1,10 +1,16 @@
-#include "defs.h"
-#include "elf.h"
-#include "fs.h"
-#include "memlayout.h"
 #include "param.h"
-#include "riscv.h"
+//
 #include "types.h"
+//
+#include "memlayout.h"
+//
+#include "elf.h"
+//
+#include "riscv.h"
+//
+#include "defs.h"
+//
+#include "fs.h"
 
 /*
  * the kernel's page table.
@@ -232,6 +238,7 @@ void freewalk(pagetable_t pagetable) {
     pte_t pte = pagetable[i];
     if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0) {
       // this PTE points to a lower-level page table.
+      // get rid of the flag bit and restore to the PN
       uint64 child = PTE2PA(pte);
       freewalk((pagetable_t)child);
       pagetable[i] = 0;
@@ -371,4 +378,32 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max) {
   }
 }
 
-void vmprint(pagetable_t pagetable) {}
+void _vmprint(pagetable_t pagetable, int level) {
+  if (level < 0 || level > 3) return;
+  // there are 2^9 = 512 PTEs in a page table.
+
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      uint64 child = PTE2PA(pte);
+
+      if (level == 1) {
+        printf("..%d pte %p pa %p\n", i, pte, child);
+      } else if (level == 2) {
+        printf(".. ..%d pte %p pa %p\n", i, pte, child);
+      } else if (level == 3) {
+        printf(".. .. ..%d pte %p pa %p\n", i, pte, child);
+        printf(".. .. ..user[%d] r[%d] w[%d]\n", !!(pte & PTE_U),
+               !!(pte & PTE_R), !!(pte & PTE_W));
+      }
+
+      // this PTE points to a lower-level page table.
+      _vmprint((pagetable_t)child, level + 1);
+    }
+  }
+}
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  _vmprint(pagetable, 1);
+}

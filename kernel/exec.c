@@ -1,11 +1,18 @@
-#include "defs.h"
-#include "elf.h"
-#include "memlayout.h"
-#include "param.h"
-#include "proc.h"
-#include "riscv.h"
-#include "spinlock.h"
 #include "types.h"
+//
+#include "param.h"
+//
+#include "memlayout.h"
+//
+#include "riscv.h"
+//
+#include "spinlock.h"
+//
+#include "proc.h"
+//
+#include "defs.h"
+//
+#include "elf.h"
 
 static int loadseg(pde_t *, uint64, struct inode *, uint, uint);
 
@@ -110,7 +117,10 @@ int exec(char *path, char **argv) {
   p->trapframe->sp = sp;          // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
-  return argc;  // this ends up in a0, the first argument to main(argc, argv)
+  if (p->pid == 1) vmprint(p->pagetable);
+
+  return argc;  // this ends up in a0, the first argument to main(argc,
+                // argv)
 
 bad:
   if (pagetable) proc_freepagetable(pagetable, sz);
