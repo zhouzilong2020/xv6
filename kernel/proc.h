@@ -102,6 +102,7 @@ struct proc {
   uint64 ksz;                   // Size of process kernel memory
   pagetable_t kpagetable;       // Kernel page table
   struct trapframe *trapframe;  // data page for trampoline.S
+  struct usyscall *usyscall;    // data page for trampoline.S
   struct context context;       // swtch() here to run process
   struct file *ofile[NOFILE];   // Open files
   struct inode *cwd;            // Current directory
