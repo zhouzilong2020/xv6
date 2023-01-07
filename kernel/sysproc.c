@@ -57,12 +57,38 @@ uint64 sys_sleep(void) {
   return 0;
 }
 
-
 #ifdef LAB_PGTBL
-int
-sys_pgaccess(void)
-{
+int sys_pgaccess(void) {
   // lab pgtbl: your code here.
+  int va, num;
+  uint64 usrbufaddr, tempbuf;
+  argint(0, &va);
+  argint(1, &num);
+  argaddr(2, &usrbufaddr);
+
+  // too many page to set
+  if (num < 0 || num > 64) {
+    return -1;
+  }
+
+  pte_t *pte;
+  int i = 0;
+  pagetable_t pagetable;
+  pagetable = myproc()->pagetable;
+  tempbuf = 0;
+  for (i = num - 1; 0 <= i; i--) {
+    pte = walk(pagetable, va + i * PGSIZE, 0);
+
+    if (!(*pte & PTE_V)) {
+      return -1;
+    }
+
+    tempbuf = (tempbuf << 1) | !!(*pte & PTE_A);
+    *pte &= (~PTE_A);
+  }
+
+  copyout(pagetable, usrbufaddr, (char *)&tempbuf, 8);
+
   return 0;
 }
 #endif
