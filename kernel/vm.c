@@ -384,21 +384,18 @@ void _vmprint(pagetable_t pagetable, int level) {
 
   for (int i = 0; i < 512; i++) {
     pte_t pte = pagetable[i];
-    if (pte & PTE_V) {
+    if (pte) {
       uint64 child = PTE2PA(pte);
-
       if (level == 1) {
-        printf("..%d pte %p pa %p\n", i, pte, child);
+        printf(" ..%d: pte %p pa %p\n", i, pte, child);
       } else if (level == 2) {
-        printf(".. ..%d pte %p pa %p\n", i, pte, child);
+        printf(" .. ..%d: pte %p pa %p\n", i, pte, child);
       } else if (level == 3) {
-        printf(".. .. ..%d pte %p pa %p\n", i, pte, child);
-        printf(".. .. ..user[%d] r[%d] w[%d]\n", !!(pte & PTE_U),
-               !!(pte & PTE_R), !!(pte & PTE_W));
+        printf(" .. .. ..%d: pte %p pa %p\n", i, pte, child);
       }
 
       // this PTE points to a lower-level page table.
-      _vmprint((pagetable_t)child, level + 1);
+      if (level < 3) _vmprint((pagetable_t)child, level + 1);
     }
   }
 }
