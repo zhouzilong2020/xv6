@@ -61,9 +61,10 @@ void usertrap(void) {
 
     syscall();
   } else if (cause == 15 /* write page fault */) {
-    uint64 va = r_stval();
+    uint64 va = PGROUNDDOWN(r_stval());
 
     if (va >= MAXVA) {
+      setkilled(p);
       usertrapret();
       return;
     }
@@ -89,9 +90,8 @@ void usertrap(void) {
     memmove(mem, (char *)pa, PGSIZE);
 
     // unmap old mapping and decrease reference
-    uvmunmap(p->pagetable, va & (~0xFFF), 1, 1);
-    if (mappages(p->pagetable, va & (~0xFFF), PGSIZE, (uint64)mem, flags) !=
-        0) {
+    uvmunmap(p->pagetable, va, 1, 1);
+    if (mappages(p->pagetable, va, PGSIZE, (uint64)mem, flags) != 0) {
       kfree(mem);
     }
 
