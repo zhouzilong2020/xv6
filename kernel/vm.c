@@ -274,10 +274,8 @@ int uvmcopy(pagetable_t old, pagetable_t new, uint64 sz) {
     flags = PTE_FLAGS(*pte);
 
     pgrefcnt[PA2PPN(pa)]++;
-    // printf("ref[%p] %d\n", pa, pgrefcnt[PA2PPN(pa)]);
     if (flags & PTE_W) {
       // only set a page as COW when it is writable initially
-      // printf("[COW] va %p pa %p\n", i, pa);
       flags = (flags | PTE_COW) & (~PTE_W);
       *pte = (*pte | PTE_COW) & (~PTE_W);
     }

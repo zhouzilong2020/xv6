@@ -54,11 +54,8 @@ void kfree(void *pa) {
     panic("kfree");
 
   int ppn = PA2PPN((uint64)pa);
-  if (ppn != -1) {
-    if (--pgrefcnt[ppn] >= 1) {
-      // printf("decrease pgrefcnt\n");
-      return;
-    }
+  if (ppn != -1 && --pgrefcnt[ppn] > 0) {
+    return;
   }
 
   // Fill with junk to catch dangling refs.
