@@ -45,7 +45,8 @@ void usertrap(void) {
   // save user program counter.
   p->trapframe->epc = r_sepc();
 
-  if (r_scause() == 8) {
+  uint64 cause = r_scause();
+  if (cause == 8) {
     // system call
 
     if (killed(p)) exit(-1);
@@ -59,10 +60,47 @@ void usertrap(void) {
     intr_on();
 
     syscall();
+  } else if (cause == 15 /* write page fault */) {
+    // printf("write fault, stval=%p, epc=%p\n", r_stval(), r_sepc());
+
+    pte_t *pte = walk(p->pagetable, r_stval(), 0);
+    if (!(*pte & PTE_COW)) {
+      printf("usertrap(): unexpected scause %p pid=%d\n", cause, p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      setkilled(p);
+    }
+
+    uint64 pa = PTE2PA(*pte);
+    // printf("[COW] write fault, va %p pte %p pa %p flag %d\n", r_stval(),
+    // *pte,
+    //  pa, PTE_FLAGS(*pte));
+
+    // cow page write fault, allocate a new page
+    int flags = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW);
+    char *mem;
+    if ((mem = kalloc()) == 0) {
+      // no more memory, kill the process
+      setkilled(p);
+      usertrapret();
+      return;
+    }
+    memmove(mem, (char *)pa, PGSIZE);
+
+    // unmap old mapping and decrease reference
+    uint64 va = r_stval();
+    uvmunmap(p->pagetable, va & (~0xFFF), 1, 1);
+    if (mappages(p->pagetable, va & (~0xFFF), PGSIZE, (uint64)mem, flags) !=
+        0) {
+      kfree(mem);
+    }
+
+    // pte = walk(p->pagetable, va, 0);
+    // printf("[alloc pte page] stval/va=%p pa=%p, flag[%d]\n\n", *pte,
+    //        PTE_FLAGS(*pte));
   } else if ((which_dev = devintr()) != 0) {
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("usertrap(): unexpected scause %p pid=%d\n", cause, p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
   }

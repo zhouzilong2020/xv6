@@ -17,6 +17,8 @@
  */
 pagetable_t kernel_pagetable;
 
+extern short pgrefcnt[];
+
 extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[];  // trampoline.S
@@ -248,7 +250,7 @@ void freewalk(pagetable_t pagetable) {
   kfree((void *)pagetable);
 }
 
-// Free user memory pages,
+// Free user memory pages if it is referenced only by the current process
 // then free page-table pages.
 void uvmfree(pagetable_t pagetable, uint64 sz) {
   if (sz > 0) uvmunmap(pagetable, 0, PGROUNDUP(sz) / PGSIZE, 1);
@@ -257,32 +259,39 @@ void uvmfree(pagetable_t pagetable, uint64 sz) {
 
 // Given a parent process's page table, copy
 // its memory into a child's page table.
-// Copies both the page table and the
-// physical memory.
+// Copies both the page table Only and mark the pte as cow page.
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 int uvmcopy(pagetable_t old, pagetable_t new, uint64 sz) {
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
   for (i = 0; i < sz; i += PGSIZE) {
     if ((pte = walk(old, i, 0)) == 0) panic("uvmcopy: pte should exist");
     if ((*pte & PTE_V) == 0) panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if ((mem = kalloc()) == 0) goto err;
-    memmove(mem, (char *)pa, PGSIZE);
-    if (mappages(new, i, PGSIZE, (uint64)mem, flags) != 0) {
-      kfree(mem);
+
+    pgrefcnt[PA2PPN(pa)]++;
+    // printf("ref[%p] %d\n", pa, pgrefcnt[PA2PPN(pa)]);
+    if (flags & PTE_W) {
+      // only set a page as COW when it is writable initially
+      // printf("[COW] va %p pa %p\n", i, pa);
+      flags = (flags | PTE_COW) & (~PTE_W);
+      *pte = (*pte | PTE_COW) & (~PTE_W);
+    }
+
+    // if the page is not cow page and cannot be written, map
+    // the flag as it is.
+    if (mappages(new, i, PGSIZE, (uint64)pa, flags) != 0) {
       goto err;
     }
   }
   return 0;
 
 err:
-  uvmunmap(new, 0, i / PGSIZE, 1);
+  uvmunmap(new, 0, i / PGSIZE, 0);
   return -1;
 }
 
@@ -375,4 +384,12 @@ int copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max) {
   } else {
     return -1;
   }
+}
+
+// only return the ppn if pa is within the RAM range
+int PA2PPN(uint64 pa) {
+  if (KERNBASE <= pa && pa < PHYSTOP) {
+    return (PGROUNDDOWN(pa) - KERNBASE) >> 12L;
+  }
+  return -1;
 }
