@@ -71,9 +71,6 @@ void usertrap(void) {
     }
 
     uint64 pa = PTE2PA(*pte);
-    // printf("[COW] write fault, va %p pte %p pa %p flag %d\n", r_stval(),
-    // *pte,
-    //  pa, PTE_FLAGS(*pte));
 
     // cow page write fault, allocate a new page
     int flags = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW);
@@ -94,9 +91,6 @@ void usertrap(void) {
       kfree(mem);
     }
 
-    // pte = walk(p->pagetable, va, 0);
-    // printf("[alloc pte page] stval/va=%p pa=%p, flag[%d]\n\n", *pte,
-    //        PTE_FLAGS(*pte));
   } else if ((which_dev = devintr()) != 0) {
     // ok
   } else {
