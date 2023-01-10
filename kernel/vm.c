@@ -314,6 +314,24 @@ int copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len) {
   while (len > 0) {
     va0 = PGROUNDDOWN(dstva);
     pa0 = walkaddr(pagetable, va0);
+
+    pte_t *pte = walk(pagetable, va0, 0);
+    if (PTE_COW & *pte) {  // cow page
+      int flags = (PTE_FLAGS(*pte) | PTE_W) & (~PTE_COW);
+      char *mem;
+      if ((mem = kalloc()) == 0) {
+        return -1;
+      }
+      memmove(mem, (char *)pa0, PGSIZE);
+
+      // unmap old mapping and decrease reference
+      uvmunmap(pagetable, va0, 1, 1);
+      if (mappages(pagetable, va0, PGSIZE, (uint64)mem, flags) != 0) {
+        kfree(mem);
+      }
+      pa0 = (uint64)mem;
+    }
+
     if (pa0 == 0) return -1;
     n = PGSIZE - (dstva - va0);
     if (n > len) n = len;
