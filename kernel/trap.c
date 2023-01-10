@@ -61,13 +61,18 @@ void usertrap(void) {
 
     syscall();
   } else if (cause == 15 /* write page fault */) {
-    // printf("write fault, stval=%p, epc=%p\n", r_stval(), r_sepc());
+    uint64 va = r_stval();
+
+    if (va >= MAXVA) {
+      usertrapret();
+      return;
+    }
 
     pte_t *pte = walk(p->pagetable, r_stval(), 0);
     if (!(*pte & PTE_COW)) {
-      printf("usertrap(): unexpected scause %p pid=%d\n", cause, p->pid);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       setkilled(p);
+      usertrapret();
+      return;
     }
 
     uint64 pa = PTE2PA(*pte);
@@ -84,7 +89,6 @@ void usertrap(void) {
     memmove(mem, (char *)pa, PGSIZE);
 
     // unmap old mapping and decrease reference
-    uint64 va = r_stval();
     uvmunmap(p->pagetable, va & (~0xFFF), 1, 1);
     if (mappages(p->pagetable, va & (~0xFFF), PGSIZE, (uint64)mem, flags) !=
         0) {
