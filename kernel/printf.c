@@ -2,9 +2,9 @@
 // formatted console output -- printf, panic.
 //
 
-#include <stdarg.h>
-
 #include "types.h"
+//
+#include <stdarg.h>
 //
 #include "param.h"
 //
