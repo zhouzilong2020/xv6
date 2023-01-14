@@ -30,11 +30,8 @@ struct {
 } kmem[NCPU];
 
 void kinit() {
-  char buf[16] = "kmem-cpu";
-  buf[9] = '\0';
   for (int i = 0; i < NCPU; i++) {
-    buf[8] = i + '0';
-    initlock(&kmem[i].lock, buf);
+    initlock(&kmem[i].lock, "kmem");
     kmem[i].freelist = 0;
     kmem[i].freecnt = 0;
   }
