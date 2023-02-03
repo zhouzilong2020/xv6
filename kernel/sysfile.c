@@ -4,6 +4,7 @@
 // user code, and calls into file.c and fs.c.
 //
 
+//
 #include "types.h"
 //
 #include "riscv.h"
@@ -290,11 +291,28 @@ uint64 sys_open(void) {
       return -1;
     }
   } else {
+    // the while loop is for recursive symlink
     if ((ip = namei(path)) == 0) {
       end_op();
       return -1;
     }
     ilock(ip);
+    int loop = 0;
+    while (ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)) {
+      if (++loop > 10) {
+        end_op();
+        return -1;
+      }
+      readi(ip, 0, (uint64)path, 0, MAXPATH);
+      iunlockput(ip);
+
+      if ((ip = namei(path)) == 0) {
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+    }
+
     if (ip->type == T_DIR && omode != O_RDONLY) {
       iunlockput(ip);
       end_op();
@@ -455,4 +473,28 @@ uint64 sys_pipe(void) {
   return 0;
 }
 
-uint64 sys_symlink(void) { return 0; }
+uint64 sys_symlink(void) {
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *ip;
+  int len;
+
+  if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0) return -1;
+
+  begin_op();
+  // create a new inode for symlink
+  if ((ip = create(path, T_SYMLINK, 1, 1)) == 0) {
+    end_op();
+    return -1;
+  }
+  len = strlen(target) + 1;
+  if (writei(ip, 0, (uint64)target, 0, len) != len) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iupdate(ip);
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
